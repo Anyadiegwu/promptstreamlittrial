@@ -3,9 +3,9 @@ import re
 import json
 import requests
 import streamlit as st
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
-load_dotenv()
+# load_dotenv()
 
 
 class AiAssistant:

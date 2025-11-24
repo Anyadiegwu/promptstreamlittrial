@@ -15,20 +15,18 @@ class AiAssistant:
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json"})
 
-    def call_with_prompt(self, prompt, temperature=0.3, max_tokens=500):
+    def call_with_prompt(self, prompt, temperature=0.3):
         url = f"{self.api_endpoint}?key={self.api_key}"
         payload = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens}
-        }
-        
+            "generationConfig": {"temperature": temperature}
+        }        
         try:
             response = self.session.post(url, json=payload, timeout=15)
             response.raise_for_status()
             return response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
         except Exception as e:
             return f"Error: {e}"
-
 
 class PromptChainProcessor:
     CATEGORIES = """
@@ -51,7 +49,7 @@ class PromptChainProcessor:
             Customer message: {user_input}
 
             Provide a clear interpretation of what the customer wants or needs. Be specific and professional."""
-        return self.ai.call_with_prompt(prompt, temperature=0.3, max_tokens=200)
+        return self.ai.call_with_prompt(prompt, temperature=0.3)
     
     def step2_suggest_categories(self, interpreted_message):
         prompt = f"""Map the query to one or more possible categories that may apply.
@@ -63,7 +61,7 @@ class PromptChainProcessor:
             {interpreted_message}
 
             Return the suggested categories (one or more) that best match this request. Format: list the category names."""
-        return self.ai.call_with_prompt(prompt, temperature=0.3, max_tokens=150)
+        return self.ai.call_with_prompt(prompt, temperature=0.3)
     
     def step3_select_category(self, interpreted_message, suggested_categories):
         prompt = f"""Select the MOST appropriate single category from the suggestions.
@@ -75,7 +73,7 @@ class PromptChainProcessor:
             {interpreted_message}
 
             Return ONLY the single most appropriate category name, nothing else."""
-        return self.ai.call_with_prompt(prompt, temperature=0.1, max_tokens=50)
+        return self.ai.call_with_prompt(prompt, temperature=0.3)
     
     def step4_extract_details(self, interpreted_message, user_input, selected_category, context_data):
         collected_info = json.dumps(context_data, indent=2) if context_data else "None yet"
@@ -102,7 +100,7 @@ class PromptChainProcessor:
                 "follow_up_question": "your question here" or null,
                 "response_to_user": "friendly message to the customer"
             }}"""
-        return self.ai.call_with_prompt(prompt, temperature=0.2, max_tokens=400)
+        return self.ai.call_with_prompt(prompt, temperature=0.3)
     
     def step5_generate_response(self, selected_category, context_data):
         collected_info = json.dumps(context_data, indent=2)
@@ -121,8 +119,7 @@ class PromptChainProcessor:
             4. Ends with an offer to help further if needed
 
             Keep it short and natural."""
-        return self.ai.call_with_prompt(prompt, temperature=0.3, max_tokens=250)
-
+        return self.ai.call_with_prompt(prompt, temperature=0.3)
 
 def run_prompt_chain(customer_query, session_state):
     user_input = customer_query.strip()
@@ -138,12 +135,8 @@ def run_prompt_chain(customer_query, session_state):
     
     if 'category' not in session_state:
         suggested_categories = session_state.processor.step2_suggest_categories(interpreted)
-        if not suggested_categories:
-            return "Failed to suggest categories."
         
         selected_category = session_state.processor.step3_select_category(interpreted, suggested_categories)
-        if not selected_category:
-            return "Failed to select category."
         
         session_state.category = selected_category
         session_state.context_data = {}
